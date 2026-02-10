@@ -1,0 +1,12 @@
+[project]
+name = "tron-auto-claim"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "base58>=2.1.1",
+    "coincurve>=21.0.0",
+    "httpx>=0.28.1",
+    "pycryptodome>=3.23.0",
+]
