@@ -3,35 +3,36 @@ from httpx import AsyncClient
 from datetime import datetime
 
 from lib.tron import calc_address_from_priv_key, get_delegate_info, claim_expired_resources, DelegateInfo
+from lib import logger
 from config import KEEP_DELEGATE_ADDRESS
 
 async def check_and_claim_resources(client: AsyncClient, priv_key: bytes, address: str, curr_epoch: float, delegate_info: DelegateInfo):
     # print delegate info
-    print()
-    print(f"Delegated to: {delegate_info.to_address}")
+    logger.log("", logger.LogLevel.INFO)
+    logger.log(f"Delegated to: {delegate_info.to_address}", logger.LogLevel.INFO)
     if delegate_info.bandwidth_sun > 0:
-        print(f"  Bandwidth: {delegate_info.bandwidth_sun} (expires at {delegate_info.bandwidth_expiry})")
+        logger.log(f"  Bandwidth: {delegate_info.bandwidth_sun} (expires at {delegate_info.bandwidth_expiry})", logger.LogLevel.INFO)
     if delegate_info.energy_sun > 0:
-        print(f"  Energy: {delegate_info.energy_sun} (expires at {delegate_info.energy_expiry})")
+        logger.log(f"  Energy: {delegate_info.energy_sun} (expires at {delegate_info.energy_expiry})", logger.LogLevel.INFO)
 
     # check if this delegate is in the keep list
     if delegate_info.to_address in KEEP_DELEGATE_ADDRESS:
-        print("  Skipping claim for this delegate as it's in the keep list.")
+        logger.log("  Skipping claim for this delegate as it's in the keep list.", logger.LogLevel.INFO)
         return
     
     # claim bandwidth if it's expired
     if delegate_info.bandwidth_sun > 0 and (delegate_info.bandwidth_expiry is None or delegate_info.bandwidth_expiry.timestamp() < curr_epoch):
-        print("  Bandwidth expired, claiming...")
+        logger.log("  Bandwidth expired, claiming...", logger.LogLevel.INFO)
         await claim_expired_resources(client, priv_key, address, delegate_info.to_address, "BANDWIDTH", delegate_info.bandwidth_sun)
 
     # claim energy if it's expired
     if delegate_info.energy_sun > 0 and (delegate_info.energy_expiry is None or delegate_info.energy_expiry.timestamp() < curr_epoch):
-        print("  Energy expired, claiming...")
+        logger.log("  Energy expired, claiming...", logger.LogLevel.INFO)
         await claim_expired_resources(client, priv_key, address, delegate_info.to_address, "ENERGY", delegate_info.energy_sun)
 
 async def main():
     if len(sys.argv) != 2:
-        print("Usage: python main.py <private_key_hex>")
+        logger.log("Usage: python main.py <private_key_hex>", logger.LogLevel.WARNING)
         sys.exit(1)
 
     PRIVATE_KEY_HEX = sys.argv[1]
