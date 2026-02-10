@@ -39,7 +39,7 @@ async def main():
     PRIVATE_KEY = bytes.fromhex(PRIVATE_KEY_HEX)
 
     address = calc_address_from_priv_key(PRIVATE_KEY)
-    print(f"Address: {address}")
+    logger.log(f"Address: {address}", logger.LogLevel.INFO)
 
     current_epoch = datetime.now().timestamp()
     async with AsyncClient() as client:
