@@ -14,4 +14,4 @@ def log(message: str, level: LogLevel = LogLevel.INFO):
     }.get(level, "[INFO]")
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{timestamp}][{prefix}] {message}", flush=True)
+    print(f"[{timestamp}]{prefix} {message}", flush=True)
