@@ -1,4 +1,4 @@
-# TRON Auto Claimer
+# TRON Auto Claim
 A auto claimer made for TRON. 
 
 ## Usage
