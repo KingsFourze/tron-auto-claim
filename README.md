@@ -13,5 +13,7 @@ A auto claimer made for TRON.
     ```
 
 ## Functions
+1. Print account balance, power infomation.
+1. Withdraw reward from voting.
 1. Print out all delegated to others resources and their expiry datetime.
-2. Claim all expired delegate.
+1. Claim all expired delegate.
