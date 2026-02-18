@@ -1,12 +1,12 @@
-import asyncio, sys
+import asyncio, sys, json
 from httpx import AsyncClient
 from datetime import datetime
 
-from lib.tron import calc_address_from_priv_key, get_delegate_info, claim_expired_resources, DelegateInfo
+from lib.tron import Tron, DelegateInfo
 from lib import logger
 from config import KEEP_DELEGATE_ADDRESS
 
-async def check_and_claim_resources(client: AsyncClient, priv_key: bytes, address: str, curr_epoch: float, delegate_info: DelegateInfo):
+async def check_and_claim_resources(tron: Tron, curr_epoch: float, delegate_info: DelegateInfo):
     # print delegate info
     logger.log("", logger.LogLevel.INFO)
     logger.log(f"Delegated to: {delegate_info.to_address}", logger.LogLevel.INFO)
@@ -23,12 +23,12 @@ async def check_and_claim_resources(client: AsyncClient, priv_key: bytes, addres
     # claim bandwidth if it's expired
     if delegate_info.bandwidth_sun > 0 and (delegate_info.bandwidth_expiry is None or delegate_info.bandwidth_expiry.timestamp() < curr_epoch):
         logger.log("  Bandwidth expired, claiming...", logger.LogLevel.INFO)
-        await claim_expired_resources(client, priv_key, address, delegate_info.to_address, "BANDWIDTH", delegate_info.bandwidth_sun)
+        await tron.claim_expired_resources(delegate_info.to_address, "BANDWIDTH", delegate_info.bandwidth_sun)
 
     # claim energy if it's expired
     if delegate_info.energy_sun > 0 and (delegate_info.energy_expiry is None or delegate_info.energy_expiry.timestamp() < curr_epoch):
         logger.log("  Energy expired, claiming...", logger.LogLevel.INFO)
-        await claim_expired_resources(client, priv_key, address, delegate_info.to_address, "ENERGY", delegate_info.energy_sun)
+        await tron.claim_expired_resources(delegate_info.to_address, "ENERGY", delegate_info.energy_sun)
 
 async def main():
     if len(sys.argv) != 2:
@@ -38,17 +38,36 @@ async def main():
     PRIVATE_KEY_HEX = sys.argv[1]
     PRIVATE_KEY = bytes.fromhex(PRIVATE_KEY_HEX)
 
-    address = calc_address_from_priv_key(PRIVATE_KEY)
-    logger.log(f"Address: {address}", logger.LogLevel.INFO)
+    tron = Tron(PRIVATE_KEY)
+    logger.log(f"Address: {tron.address}", logger.LogLevel.INFO)
 
-    current_epoch = datetime.now().timestamp()
-    async with AsyncClient() as client:
-        delegate_info = await get_delegate_info(client, address)
-        if delegate_info is None or len(delegate_info) == 0:
-            return
-        
-        for info in delegate_info:
-            await check_and_claim_resources(client, PRIVATE_KEY, address, current_epoch, info)
+    account_info = await tron.get_account_info()
+    if account_info is None:
+        logger.log("Failed to fetch account info. Exiting.", logger.LogLevel.ERROR)
+        sys.exit(1)
+    logger.log(f"   Balance: {account_info.balance_trx} TRX", logger.LogLevel.INFO)
+    logger.log(f"   Power: {account_info.staked_resources.power} | Voted: {account_info.staked_resources.voted_power} | Leaves: {account_info.staked_resources.power - account_info.staked_resources.voted_power}", logger.LogLevel.INFO)
+
+    reward_trx = await tron.get_reward_info()
+    logger.log(f"   Reward: {reward_trx} TRX", logger.LogLevel.INFO)
+    logger.log(f"   Latest Withdraw Time: {account_info.latest_withdraw_time}", logger.LogLevel.INFO)
+
+    logger.log("", logger.LogLevel.INFO)
+
+    if reward_trx > 0 and account_info.latest_withdraw_time is not None and datetime.now().timestamp() - account_info.latest_withdraw_time.timestamp() > 24 * 60 * 60:
+        logger.log("Reward available and last withdraw was more than 24 hours ago, claiming reward...", logger.LogLevel.INFO)
+        success = await tron.withdraw_rewards()
+        if success:
+            logger.log("Reward claimed successfully.", logger.LogLevel.INFO)
+            account_info.balance_trx += reward_trx
+        else:
+            logger.log("Failed to claim reward.", logger.LogLevel.WARNING)
+
+    delegate_info = await tron.get_delegate_info()
+    if delegate_info is None or len(delegate_info) == 0:
+        return
+    for info in delegate_info:
+        await check_and_claim_resources(tron, datetime.now().timestamp(), info)
 
 if __name__ == "__main__":
     asyncio.run(main())
